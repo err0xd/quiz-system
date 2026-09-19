@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="utf-8">
+  <title>雲端課堂測驗與注音打字練習系統</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <meta name="description" content="包含全學期 16 週隨堂課堂測驗、重大考試與標準指法中打注音練習系統">
+  <link rel="stylesheet" href="styles.css">
+  <!-- Google 官方 Google Identity Services (GIS) SDK -->
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <!-- 集中設定檔 (Client ID 與 API URL) -->
+  <script src="config.js"></script>
+  <!-- 主應用程式邏輯 -->
+  <script src="app.js" defer></script>
+</head>
+<body>
+
+  <!-- 頂部導航列 -->
+  <header class="navbar">
+    <div class="nav-container">
+      <a href="#" class="brand-logo" onclick="switchModule('typing'); return false;">
+        <div class="brand-badge">Q</div>
+        <span>雲端數位學習系統</span>
+      </a>
+
+      <!-- 核心模組切換按鈕 (注音打字 vs 課堂測驗) -->
+      <div class="nav-modules">
+        <button class="nav-module-btn active" id="navMod_typing" onclick="switchModule('typing')">
+          <span>⌨️</span> 注音打字練習
+        </button>
+        <button class="nav-module-btn" id="navMod_quiz" onclick="switchModule('quiz')">
+          <span>📋</span> 課堂測驗
+        </button>
+      </div>
+
+      <!-- 登入學生 Google 身分（點擊可查看或修改） -->
+      <div class="user-badge" id="userBadge" onclick="promptEditIdentity(true)" style="cursor: pointer;" title="點擊可設定或修改學生身分資訊">
+        <div id="userAvatarContainer" style="display:flex; align-items:center;">
+          <div class="user-icon" id="userAvatarInitial">?</div>
+          <img id="userAvatarImg" class="user-avatar-img" src="" alt="Google Avatar" style="display:none;">
+        </div>
+        <span id="userEmailText">未登入 (訪客)</span>
+        <span style="font-size: 0.75rem; opacity: 0.7; margin-left: 2px;">✏️</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- 主內容容器 -->
+  <main class="main-content">
+
+    <!-- 1. 測驗大廳儀表板 (Dashboard View) -->
+    <section id="dashboardView" class="view-section">
+      <div class="dashboard-header">
+        <h1>學期測驗與評量中心</h1>
+        <p>歡迎進入線上測驗大廳！本系統包含全學期 16 週隨堂課堂測驗，以及期中考與期末考。請掌握作答時間與次數上限，祝您作答順利！</p>
+
+        <div class="dashboard-stats">
+          <div class="stat-pill">
+            <div class="stat-pill-icon">📋</div>
+            <div>
+              <div class="stat-pill-text">測驗完成進度</div>
+              <div class="stat-pill-value" id="statTotalCount">-- / 18</div>
+            </div>
+          </div>
+          <div class="stat-pill">
+            <div class="stat-pill-icon">🌟</div>
+            <div>
+              <div class="stat-pill-text">個人平均成績</div>
+              <div class="stat-pill-value" id="statAvgScore">-- 分</div>
+            </div>
+          </div>
+          <div class="stat-pill">
+            <div class="stat-pill-icon">🎯</div>
+            <div>
+              <div class="stat-pill-text">及格達標單元</div>
+              <div class="stat-pill-value" id="statPassRate">-- 單元</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="category-tabs">
+        <button class="tab-btn active" onclick="setTab('all', this)">全部單元 (18)</button>
+        <button class="tab-btn" onclick="setTab('weekly', this)">課堂測驗 (16週)</button>
+        <button class="tab-btn" onclick="setTab('major', this)">重大考試 (期中/期末)</button>
+        <button class="tab-btn" onclick="setTab('completed', this)">已完成作答</button>
+      </div>
+
+      <div class="quiz-grid" id="quizGrid"></div>
+    </section>
+
+    <!-- 2. 測驗作答畫面 (Quiz View) -->
+    <section id="quizView" class="view-section">
+      <div class="exam-header">
+        <div class="exam-info">
+          <h2 id="examTitle">測驗單元名稱</h2>
+          <p id="examSubtitle">作答進行中，請依序完成各題</p>
+        </div>
+        <div class="exam-timer" id="examTimer">
+          <span>⏱️</span>
+          <span id="timerText">00:00</span>
+        </div>
+      </div>
+
+      <div class="exam-container">
+        <div class="question-card">
+          <div class="question-header">
+            <span class="q-badge" id="qIndexBadge">第 1 題</span>
+            <span class="q-points" id="qPointsBadge">配分：10 分</span>
+          </div>
+
+          <div class="q-text" id="qText">載入題目中...</div>
+          <div class="options-list" id="optionsContainer"></div>
+
+          <div class="question-actions">
+            <button class="btn btn-secondary" id="btnPrev" onclick="prevQuestion()" disabled>
+              ← 上一題
+            </button>
+            <div style="display: flex; gap: 10px;">
+              <button class="btn btn-primary" id="btnNext" onclick="nextQuestion()">
+                下一題 →
+              </button>
+              <button class="btn btn-success" id="btnSubmitPrompt" onclick="confirmSubmit()" style="display: none;">
+                ✓ 提交試卷
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <aside class="exam-sidebar">
+          <div class="sidebar-title">題目快速導航</div>
+          <div class="palette-grid" id="questionPalette"></div>
+          <div id="answeredStat" style="font-size: 0.85rem; color: var(--slate-600); margin-bottom: 16px; text-align: center; font-weight: 600;">
+            已作答：0 / 0
+          </div>
+          <button class="btn btn-success" style="width: 100%;" onclick="confirmSubmit()">
+            確認交卷
+          </button>
+        </aside>
+      </div>
+    </section>
+
+    <!-- 3. 成績結算報告 (Result View) -->
+    <section id="resultView" class="view-section">
+      <div class="result-banner">
+        <div class="result-icon pass" id="resultIcon">🏆</div>
+        <div id="resultBadgeText" style="font-weight: 800; letter-spacing: 0.05em; font-size: 0.95rem;">及格 PASS</div>
+        <h2 id="resultTitle" style="font-size: 1.8rem; margin-top: 6px; color: var(--slate-800);">恭喜您完成測驗！</h2>
+
+        <div class="result-score">
+          <span id="resultScore">0</span>
+          <span style="font-size: 1.5rem; color: var(--slate-400); font-weight: 600;" id="resultTotal">/ 100 分</span>
+        </div>
+
+        <div class="result-meta-grid">
+          <div class="result-meta-card">
+            <span>耗費時間</span>
+            <strong id="resTimeSpent">0分 0秒</strong>
+          </div>
+          <div class="result-meta-card">
+            <span>作答次數</span>
+            <strong id="resAttemptNum">第 1 次</strong>
+          </div>
+          <div class="result-meta-card">
+            <span>答對題數</span>
+            <strong id="resCorrectCount">0 / 0 題</strong>
+          </div>
+        </div>
+
+        <div style="display: flex; justify-content: center; gap: 14px; margin-top: 12px;">
+          <button class="btn btn-primary" onclick="backToDashboard()">
+            ← 返回測驗大廳
+          </button>
+        </div>
+      </div>
+
+      <div class="review-section">
+        <div class="review-title">📝 試卷詳細對照與解答說明</div>
+        <div id="reviewList"></div>
+      </div>
+    </section>
+
+    <!-- 4. 注音打字練習模組 (Typing Practice View) -->
+    <section id="typingView" class="view-section active">
+      <div class="typing-wrapper">
+
+        <!-- 頂部設定列 -->
+        <div class="typing-ctrl-bar">
+          <div style="display: flex; align-items: center; gap: 8px; font-weight: 700; color: var(--slate-700);">
+            <span style="font-size: 1.2rem;">⌨️</span>
+            <span>中打基本功－注音鍵盤練習（盲打挑戰）</span>
+          </div>
+
+          <!-- 練習時長選擇 -->
+          <div class="time-selector">
+            <span>練習時間：</span>
+            <div class="time-pill" id="timePill_60" onclick="setTypingTime(60)">60秒</div>
+            <div class="time-pill" id="timePill_120" onclick="setTypingTime(120)">120秒</div>
+            <div class="time-pill active" id="timePill_180" onclick="setTypingTime(180)">180秒 (3分)</div>
+          </div>
+        </div>
+
+        <!-- 遊戲計分與速度儀表板 -->
+        <div class="typing-stats-grid">
+          <div class="typing-stat-card val-score">
+            <div class="label">得分 (Score)</div>
+            <div class="val" id="typScore">0</div>
+          </div>
+          <div class="typing-stat-card val-correct">
+            <div class="label">答對 (Correct)</div>
+            <div class="val" id="typCorrect">0</div>
+          </div>
+          <div class="typing-stat-card val-wrong">
+            <div class="label">答錯 (Wrong)</div>
+            <div class="val" id="typWrong">0</div>
+          </div>
+          <div class="typing-stat-card val-time">
+            <div class="label">剩餘秒數 (Seconds)</div>
+            <div class="val" id="typTime">180</div>
+          </div>
+          <div class="typing-stat-card">
+            <div class="label">打字速度 (CPM)</div>
+            <div class="val" id="typCPM">0</div>
+          </div>
+        </div>
+
+        <!-- 中央注音符號目標大字卡 -->
+        <div class="target-card-area">
+          <div class="target-box" id="targetBox">
+            <span id="targetChar">ㄅ</span>
+          </div>
+          <div class="target-hint">
+            <span>對應按鍵：<kbd id="targetKeyHint">1</kbd></span>
+            <span class="finger-badge" id="targetFingerBadge">左手小指</span>
+          </div>
+        </div>
+
+        <!-- 實境螢幕注音鍵盤 (Virtual Keyboard) -->
+        <div class="v-keyboard" id="virtualKeyboard">
+          <!-- 由 JavaScript 動態生成 5 排完整鍵帽 -->
+        </div>
+
+        <!-- 操作按鈕 -->
+        <div class="typing-action-area">
+          <button class="btn-start-game" id="btnStartTyping" onclick="startTypingGame()">
+            開始練習 (START)
+          </button>
+        </div>
+
+        <!-- 說明卡片 -->
+        <div style="background: white; border: 1px solid var(--border); border-radius: var(--radius-md); padding: 20px 24px; margin-top: 28px; color: var(--slate-600); font-size: 0.88rem; line-height: 1.6;">
+          <h4 style="color: var(--slate-800); margin-bottom: 8px;">💡 中打基本功－注音鍵盤練習說明：</h4>
+          <ul style="padding-left: 20px;">
+            <li>利用實境鍵盤視覺與實體鍵盤手指記憶，快速熟悉 37 個注音符號與 4 個聲調的位置。</li>
+            <li>點擊「開始練習」後，請直接敲擊電腦的實體鍵盤（使用滑鼠點擊畫面鍵盤不計入成績）。</li>
+            <li>練習完成後，系統會自動將您的得分、正確率與 CPM 打字速度儲存至 Google 試算表 <strong>[TypingLogs]</strong> 工作表。</li>
+          </ul>
+        </div>
+
+      </div>
+    </section>
+
+  </main>
+
+  <!-- 打字練習結算彈窗 (Typing Result Modal) -->
+  <div class="modal-overlay" id="typingResultModal">
+    <div class="modal-card">
+      <div style="font-size: 3rem; margin-bottom: 8px;">🎉</div>
+      <h3 style="font-size: 1.6rem; color: var(--slate-800); margin-bottom: 6px;">練習時間結束！</h3>
+      <p style="color: var(--slate-600); font-size: 0.9rem; margin-bottom: 20px;">表現非常棒！以下是您的本次打字評量報告：</p>
+
+      <div style="background: var(--slate-100); border-radius: var(--radius-md); padding: 18px; margin-bottom: 20px; text-align: left; font-size: 0.95rem;">
+        <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+          <span>最終得分：</span><strong style="color:var(--warning); font-size:1.2rem;" id="resTypScore">0 分</strong>
+        </div>
+        <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+          <span>打字速度 (CPM)：</span><strong style="color:var(--primary); font-size:1.2rem;" id="resTypCPM">0 字/分</strong>
+        </div>
+        <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+          <span>正確率：</span><strong style="color:var(--success);" id="resTypAcc">100%</strong>
+        </div>
+        <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+          <span>答對 / 答錯：</span><span id="resTypCorrect">0</span> 題對 / <span id="resTypWrong">0</span> 題錯
+        </div>
+        <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+          <span>練習模式 / 時間：</span><span id="resTypMode">盲打挑戰</span> (<span id="resTypTime">180 秒</span>)
+        </div>
+      </div>
+
+      <!-- 試算表寫入狀態提示 -->
+      <div id="typingSyncStatus" style="font-size: 0.85rem; margin-bottom: 20px;"></div>
+
+      <div style="display: flex; gap: 12px; justify-content: center;">
+        <button class="btn btn-primary" onclick="closeTypingModal(); startTypingGame();">
+          🔄 再練一次
+        </button>
+        <button class="btn btn-secondary" onclick="closeTypingModal(); switchModule('quiz');">
+          📋 前往課堂測驗
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 全域 Loading 遮罩 -->
+  <div class="modal-overlay" id="loadingModal">
+    <div class="modal-card">
+      <div class="spinner"></div>
+      <div id="loadingText" style="font-size: 1.05rem; font-weight: 600; color: var(--slate-800);">
+        處理中，請稍候...
+      </div>
+    </div>
+  </div>
+
+  <!-- 學生身分確認彈窗 (支援 Google 官方一鍵登入授權 與 手動輸入) -->
+  <div class="modal-overlay" id="identityModal">
+    <div class="modal-card" style="max-width: 450px; text-align: left;">
+      <div style="text-align: center; font-size: 2.6rem; margin-bottom: 6px;">🎓</div>
+      <h3 style="font-size: 1.35rem; color: var(--slate-800); text-align: center; margin-bottom: 6px;">學生身分識別與登入</h3>
+      <p style="color: var(--slate-600); font-size: 0.86rem; line-height: 1.5; margin-bottom: 16px; text-align: center;">
+        此身分將作為課堂測驗與打字練習成績登錄依據：
+      </p>
+
+      <!-- Google 官方一鍵登入區塊 (在 GitHub Pages 網域下 100% 順暢運作) -->
+      <div class="google-auth-box">
+        <div style="font-size: 0.92rem; font-weight: 700; color: var(--slate-800); margin-bottom: 3px;">
+          ⚡ 推薦：使用 Google 帳戶一鍵授權
+        </div>
+        <div style="font-size: 0.78rem; color: var(--slate-600); margin-bottom: 10px;">
+          支援個人 Gmail (@gmail.com)，自動獲取中文姓名與頭像
+        </div>
+
+        <!-- Google 官方 GIS 按鈕容器 -->
+        <div class="google-btn-container" id="googleSignInBtnContainer"></div>
+        <div id="googleInitNotice" class="google-client-hint">正在載入 Google 登入元件...</div>
+
+        <!-- 本地測試支援 -->
+        <div style="margin-top: 10px; padding-top: 8px; border-top: 1px dashed var(--slate-200); text-align: center;">
+          <button type="button" class="btn btn-secondary" style="font-size: 0.8rem; padding: 4px 12px; border-radius: 50px; background: #eef2ff; color: var(--primary); border: 1px solid #c7d2fe;" onclick="mockGoogleSignInSuccess()">
+            ✨ [本機測試] 一鍵模擬 Google 授權成功
+          </button>
+        </div>
+      </div>
+
+      <div class="auth-divider">或 手動輸入身分資訊</div>
+
+      <div style="margin-bottom: 14px;">
+        <label style="display: block; font-size: 0.85rem; font-weight: 700; color: var(--slate-700); margin-bottom: 6px;">
+          學生 Email 或 學號 <span style="color:var(--danger);">*</span>：
+        </label>
+        <input type="text" id="inputUserEmail" placeholder="例如：student@gmail.com 或 B11209001" style="width: 100%; padding: 10px 14px; border: 1.5px solid var(--border); border-radius: var(--radius-sm); font-size: 0.95rem; outline: none; transition: var(--transition);">
+      </div>
+      <div style="margin-bottom: 20px;">
+        <label style="display: block; font-size: 0.85rem; font-weight: 700; color: var(--slate-700); margin-bottom: 6px;">
+          學生姓名（選填）：
+        </label>
+        <input type="text" id="inputUserName" placeholder="例如：王小明" style="width: 100%; padding: 10px 14px; border: 1.5px solid var(--border); border-radius: var(--radius-sm); font-size: 0.95rem; outline: none; transition: var(--transition);">
+      </div>
+      <div style="display: flex; gap: 10px; justify-content: flex-end;">
+        <button class="btn btn-primary" style="width: 100%;" onclick="confirmStudentIdentity()">手動確認並開始</button>
+      </div>
+    </div>
+  </div>
+
+</body>
+</html>
