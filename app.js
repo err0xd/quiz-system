@@ -241,20 +241,12 @@ function playSound(type) {
 }
 
 // ==========================================
-// 3. 模組切換 (注音打字 vs 課堂測驗)
+// 3. 模組狀態 (注音打字練習)
 // ==========================================
 function switchModule(mod) {
-  state.currentModule = mod;
-  document.querySelectorAll('.nav-module-btn').forEach(btn => btn.classList.remove('active'));
-  document.getElementById(`navMod_${mod}`).classList.add('active');
-
-  if (mod === 'quiz') {
-    stopTypingGame();
-    switchView('dashboardView');
-  } else if (mod === 'typing') {
-    switchView('typingView');
-    resetTypingGame();
-  }
+  state.currentModule = 'typing';
+  switchView('typingView');
+  resetTypingGame();
 }
 
 // ==========================================
@@ -328,12 +320,11 @@ function setTypingMode(mode) {
 }
 
 function setTypingTime(sec) {
-  if (typingState.isPlaying) return;
-  typingState.duration = sec;
-  typingState.timeLeft = sec;
-  document.querySelectorAll('.time-pill').forEach(p => p.classList.remove('active'));
-  document.getElementById(`timePill_${sec}`).classList.add('active');
-  document.getElementById('typTime').innerText = sec;
+  // 練習時間直接固定為 3 分鐘 (180 秒)
+  typingState.duration = 180;
+  typingState.timeLeft = 180;
+  const timeElem = document.getElementById('typTime');
+  if (timeElem) timeElem.innerText = '180';
 }
 
 function resetTypingGame() {
@@ -463,6 +454,14 @@ function setupKeyboardShortcuts() {
 }
 
 function handlePhysicalKeyPress(pressedKey, keyCode) {
+  // 敲擊實體鍵盤時立即填色視覺反饋 ⭐
+  const pressedId = `key_${pressedKey === ' ' || keyCode === 'Space' ? 'Space' : pressedKey}`;
+  const pressedElem = document.getElementById(pressedId);
+  if (pressedElem) {
+    pressedElem.classList.add('pressed');
+    setTimeout(() => pressedElem.classList.remove('pressed'), 160);
+  }
+
   if (!typingState.isPlaying || !typingState.currentTarget) return;
 
   const expectedKey = typingState.currentTarget.key.toLowerCase();
@@ -500,11 +499,9 @@ function handlePhysicalKeyPress(pressedKey, keyCode) {
     void box.offsetWidth;
     box.classList.add('shake');
 
-    const pressedId = `key_${pressedKey === ' ' ? 'Space' : pressedKey}`;
-    const wrongElem = document.getElementById(pressedId);
-    if (wrongElem) {
-      wrongElem.classList.add('hit-wrong');
-      setTimeout(() => wrongElem.classList.remove('hit-wrong'), 160);
+    if (pressedElem) {
+      pressedElem.classList.add('hit-wrong');
+      setTimeout(() => pressedElem.classList.remove('hit-wrong'), 160);
     }
   }
 }
@@ -528,7 +525,7 @@ function finishTypingGame() {
 
   document.getElementById('typingResultModal').classList.add('active');
 
-  // 同步練習紀錄至後端
+  // 同步練習紀錄至後端 (含 Google ID Token 簽章)
   syncTypingLogToSheet({
     mode: '盲打挑戰',
     durationSec: durationSec,
@@ -538,7 +535,8 @@ function finishTypingGame() {
     accuracy: acc,
     cpm: cpm,
     userEmail: state.currentUser ? state.currentUser.email : (localStorage.getItem('gas_quiz_user_email') || ''),
-    userName: state.currentUser ? state.currentUser.name : (localStorage.getItem('gas_quiz_user_name') || '')
+    userName: state.currentUser ? state.currentUser.name : (localStorage.getItem('gas_quiz_user_name') || ''),
+    idToken: getAuthIdToken()
   });
 }
 
@@ -612,7 +610,7 @@ function initGoogleIdentityServices() {
   } catch (err) {
     console.error('Google GIS Init error:', err);
     if (noticeElem) {
-      noticeElem.innerText = 'Google 登入元件載入中，您亦可直接點擊下方模擬按鈕測試。';
+      noticeElem.innerText = '正在等待 Google 登入元件載入，請確認網路連線正常...';
     }
   }
 }
@@ -644,7 +642,7 @@ function handleGoogleSignInResponse(response) {
 
   const payload = parseJwt(response.credential);
   if (!payload || !payload.email) {
-    alert('無法解析 Google 帳戶身分，請改用手動輸入！');
+    alert('無法解析 Google 帳戶身分，請重新登入！');
     return;
   }
 
@@ -655,11 +653,13 @@ function handleGoogleSignInResponse(response) {
   state.currentUser = {
     email: email,
     name: name,
-    avatar: picture
+    avatar: picture,
+    idToken: response.credential
   };
 
   localStorage.setItem('gas_quiz_user_email', email);
   localStorage.setItem('gas_quiz_user_name', name);
+  sessionStorage.setItem('gas_quiz_id_token', response.credential);
   if (picture) {
     localStorage.setItem('gas_quiz_user_avatar', picture);
   } else {
@@ -719,12 +719,14 @@ function initUserIdentity() {
   const cachedEmail = localStorage.getItem('gas_quiz_user_email') || '';
   const cachedName = localStorage.getItem('gas_quiz_user_name') || '';
   const cachedAvatar = localStorage.getItem('gas_quiz_user_avatar') || '';
+  const cachedIdToken = sessionStorage.getItem('gas_quiz_id_token') || '';
 
   if (cachedEmail && cachedEmail !== 'student@school.edu.tw') {
     state.currentUser = {
       email: cachedEmail,
       name: cachedName || cachedEmail.split('@')[0],
-      avatar: cachedAvatar
+      avatar: cachedAvatar,
+      idToken: cachedIdToken
     };
     updateUserBadgeUI();
     return true;
@@ -761,14 +763,6 @@ function updateUserBadgeUI() {
 function promptEditIdentity(canCancel = true) {
   const modal = document.getElementById('identityModal');
   if (!modal) return;
-  const inputEmail = document.getElementById('inputUserEmail');
-  const inputName = document.getElementById('inputUserName');
-  if (inputEmail && state.currentUser) {
-    inputEmail.value = state.currentUser.email || '';
-  }
-  if (inputName && state.currentUser) {
-    inputName.value = state.currentUser.name || '';
-  }
   modal.classList.add('active');
   initGoogleIdentityServices();
 }
@@ -787,17 +781,26 @@ function confirmStudentIdentity() {
   state.currentUser = {
     email: emailVal,
     name: nameVal || emailVal.split('@')[0],
-    avatar: ''
+    avatar: '',
+    idToken: ''
   };
 
   localStorage.setItem('gas_quiz_user_email', emailVal);
   if (nameVal) localStorage.setItem('gas_quiz_user_name', nameVal);
   localStorage.removeItem('gas_quiz_user_avatar');
+  sessionStorage.removeItem('gas_quiz_id_token');
 
   updateUserBadgeUI();
   document.getElementById('identityModal').classList.remove('active');
 
   loadDashboardData();
+}
+
+/**
+ * 取得當前 Google 授權憑證 ID Token (供後端進行數位簽章驗證)
+ */
+function getAuthIdToken() {
+  return (state.currentUser && state.currentUser.idToken) || sessionStorage.getItem('gas_quiz_id_token') || '';
 }
 
 // ==========================================
@@ -848,8 +851,9 @@ async function apiPost(action, payload = {}) {
 function loadDashboardData() {
   showLoading('正在載入測驗列表與個人學習進度...');
   const userEmail = state.currentUser ? state.currentUser.email : (localStorage.getItem('gas_quiz_user_email') || '');
+  const idToken = getAuthIdToken();
 
-  apiGet('getQuizzesAndUserData', { userEmail })
+  apiGet('getQuizzesAndUserData', { userEmail, idToken })
     .then(handleDashboardData)
     .catch(handleApiError);
 }
@@ -959,8 +963,10 @@ function renderQuizCards() {
 
 function startQuiz(quizId) {
   showLoading('正在準備試卷題目...');
+  const userEmail = state.currentUser ? state.currentUser.email : (localStorage.getItem('gas_quiz_user_email') || '');
+  const idToken = getAuthIdToken();
 
-  apiGet('getQuestions', { quizId })
+  apiGet('getQuestions', { quizId, userEmail, idToken })
     .then(res => {
       hideLoading();
       if (!res || !res.success) {
@@ -1114,7 +1120,8 @@ function submitQuiz(isAutoSubmit) {
     answers: state.answers,
     timeSpentSec: Math.round((new Date().getTime() - state.startTime) / 1000),
     userEmail: state.currentUser ? state.currentUser.email : (localStorage.getItem('gas_quiz_user_email') || ''),
-    userName: state.currentUser ? state.currentUser.name : (localStorage.getItem('gas_quiz_user_name') || '')
+    userName: state.currentUser ? state.currentUser.name : (localStorage.getItem('gas_quiz_user_name') || ''),
+    idToken: getAuthIdToken()
   };
 
   apiPost('submitQuiz', payload)
