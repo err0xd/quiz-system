@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
   <meta charset="utf-8">
-  <title>雲端課堂測驗與注音打字練習系統</title>
+  <title>注音打字練習系統</title>
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
   <meta name="description" content="包含全學期 16 週隨堂課堂測驗、重大考試與標準指法中打注音練習系統">
   <link rel="stylesheet" href="styles.css">
@@ -18,20 +18,10 @@
   <!-- 頂部導航列 -->
   <header class="navbar">
     <div class="nav-container">
-      <a href="#" class="brand-logo" onclick="switchModule('typing'); return false;">
-        <div class="brand-badge">Q</div>
-        <span>雲端數位學習系統</span>
+      <a href="#" class="brand-logo" onclick="return false;">
+        <div class="brand-badge">⌨️</div>
+        <span>注音打字練習系統</span>
       </a>
-
-      <!-- 核心模組切換按鈕 (注音打字 vs 課堂測驗) -->
-      <div class="nav-modules">
-        <button class="nav-module-btn active" id="navMod_typing" onclick="switchModule('typing')">
-          <span>⌨️</span> 注音打字練習
-        </button>
-        <button class="nav-module-btn" id="navMod_quiz" onclick="switchModule('quiz')">
-          <span>📋</span> 課堂測驗
-        </button>
-      </div>
 
       <!-- 登入學生 Google 身分（點擊可查看或修改） -->
       <div class="user-badge" id="userBadge" onclick="promptEditIdentity(true)" style="cursor: pointer;" title="點擊可設定或修改學生身分資訊">
@@ -48,8 +38,8 @@
   <!-- 主內容容器 -->
   <main class="main-content">
 
-    <!-- 1. 測驗大廳儀表板 (Dashboard View) -->
-    <section id="dashboardView" class="view-section">
+    <!-- 1. 測驗大廳儀表板 (已依需求隱藏) -->
+    <section id="dashboardView" class="view-section" style="display: none !important;">
       <div class="dashboard-header">
         <h1>學期測驗與評量中心</h1>
         <p>歡迎進入線上測驗大廳！本系統包含全學期 16 週隨堂課堂測驗，以及期中考與期末考。請掌握作答時間與次數上限，祝您作答順利！</p>
@@ -89,8 +79,8 @@
       <div class="quiz-grid" id="quizGrid"></div>
     </section>
 
-    <!-- 2. 測驗作答畫面 (Quiz View) -->
-    <section id="quizView" class="view-section">
+    <!-- 2. 測驗作答畫面 (已依需求隱藏) -->
+    <section id="quizView" class="view-section" style="display: none !important;">
       <div class="exam-header">
         <div class="exam-info">
           <h2 id="examTitle">測驗單元名稱</h2>
@@ -140,8 +130,8 @@
       </div>
     </section>
 
-    <!-- 3. 成績結算報告 (Result View) -->
-    <section id="resultView" class="view-section">
+    <!-- 3. 成績結算報告 (已依需求隱藏) -->
+    <section id="resultView" class="view-section" style="display: none !important;">
       <div class="result-banner">
         <div class="result-icon pass" id="resultIcon">🏆</div>
         <div id="resultBadgeText" style="font-weight: 800; letter-spacing: 0.05em; font-size: 0.95rem;">及格 PASS</div>
@@ -191,12 +181,10 @@
             <span>中打基本功－注音鍵盤練習（盲打挑戰）</span>
           </div>
 
-          <!-- 練習時長選擇 -->
+          <!-- 練習時長 (固定為 3 分鐘) -->
           <div class="time-selector">
             <span>練習時間：</span>
-            <div class="time-pill" id="timePill_60" onclick="setTypingTime(60)">60秒</div>
-            <div class="time-pill" id="timePill_120" onclick="setTypingTime(120)">120秒</div>
-            <div class="time-pill active" id="timePill_180" onclick="setTypingTime(180)">180秒 (3分)</div>
+            <div class="time-pill active" style="cursor: default; pointer-events: none;">3 分鐘 (180秒)</div>
           </div>
         </div>
 
@@ -294,8 +282,8 @@
         <button class="btn btn-primary" onclick="closeTypingModal(); startTypingGame();">
           🔄 再練一次
         </button>
-        <button class="btn btn-secondary" onclick="closeTypingModal(); switchModule('quiz');">
-          📋 前往課堂測驗
+        <button class="btn btn-secondary" onclick="closeTypingModal();">
+          關閉視窗
         </button>
       </div>
     </div>
@@ -311,52 +299,27 @@
     </div>
   </div>
 
-  <!-- 學生身分確認彈窗 (支援 Google 官方一鍵登入授權 與 手動輸入) -->
+  <!-- 學生身分確認彈窗 (僅保留 Google 官方授權登入) -->
   <div class="modal-overlay" id="identityModal">
-    <div class="modal-card" style="max-width: 450px; text-align: left;">
-      <div style="text-align: center; font-size: 2.6rem; margin-bottom: 6px;">🎓</div>
-      <h3 style="font-size: 1.35rem; color: var(--slate-800); text-align: center; margin-bottom: 6px;">學生身分識別與登入</h3>
-      <p style="color: var(--slate-600); font-size: 0.86rem; line-height: 1.5; margin-bottom: 16px; text-align: center;">
-        此身分將作為課堂測驗與打字練習成績登錄依據：
+    <div class="modal-card" style="max-width: 440px; text-align: center;">
+      <div style="font-size: 2.6rem; margin-bottom: 6px;">🎓</div>
+      <h3 style="font-size: 1.35rem; color: var(--slate-800); margin-bottom: 6px;">學生身分登入</h3>
+      <p style="color: var(--slate-600); font-size: 0.88rem; line-height: 1.5; margin-bottom: 20px;">
+        請使用 Google 帳戶登入，打字練習紀錄將自動登錄至教師試算表：
       </p>
 
-      <!-- Google 官方一鍵登入區塊 (在 GitHub Pages 網域下 100% 順暢運作) -->
+      <!-- Google 官方一鍵登入區塊 -->
       <div class="google-auth-box">
-        <div style="font-size: 0.92rem; font-weight: 700; color: var(--slate-800); margin-bottom: 3px;">
-          ⚡ 推薦：使用 Google 帳戶一鍵授權
+        <div style="font-size: 0.95rem; font-weight: 700; color: var(--slate-800); margin-bottom: 4px;">
+          使用 Google 帳戶一鍵授權
         </div>
-        <div style="font-size: 0.78rem; color: var(--slate-600); margin-bottom: 10px;">
+        <div style="font-size: 0.8rem; color: var(--slate-600); margin-bottom: 14px;">
           支援個人 Gmail (@gmail.com)，自動獲取中文姓名與頭像
         </div>
 
         <!-- Google 官方 GIS 按鈕容器 -->
-        <div class="google-btn-container" id="googleSignInBtnContainer"></div>
+        <div class="google-btn-container" id="googleSignInBtnContainer" style="display: flex; justify-content: center;"></div>
         <div id="googleInitNotice" class="google-client-hint">正在載入 Google 登入元件...</div>
-
-        <!-- 本地測試支援 -->
-        <div style="margin-top: 10px; padding-top: 8px; border-top: 1px dashed var(--slate-200); text-align: center;">
-          <button type="button" class="btn btn-secondary" style="font-size: 0.8rem; padding: 4px 12px; border-radius: 50px; background: #eef2ff; color: var(--primary); border: 1px solid #c7d2fe;" onclick="mockGoogleSignInSuccess()">
-            ✨ [本機測試] 一鍵模擬 Google 授權成功
-          </button>
-        </div>
-      </div>
-
-      <div class="auth-divider">或 手動輸入身分資訊</div>
-
-      <div style="margin-bottom: 14px;">
-        <label style="display: block; font-size: 0.85rem; font-weight: 700; color: var(--slate-700); margin-bottom: 6px;">
-          學生 Email 或 學號 <span style="color:var(--danger);">*</span>：
-        </label>
-        <input type="text" id="inputUserEmail" placeholder="例如：student@gmail.com 或 B11209001" style="width: 100%; padding: 10px 14px; border: 1.5px solid var(--border); border-radius: var(--radius-sm); font-size: 0.95rem; outline: none; transition: var(--transition);">
-      </div>
-      <div style="margin-bottom: 20px;">
-        <label style="display: block; font-size: 0.85rem; font-weight: 700; color: var(--slate-700); margin-bottom: 6px;">
-          學生姓名（選填）：
-        </label>
-        <input type="text" id="inputUserName" placeholder="例如：王小明" style="width: 100%; padding: 10px 14px; border: 1.5px solid var(--border); border-radius: var(--radius-sm); font-size: 0.95rem; outline: none; transition: var(--transition);">
-      </div>
-      <div style="display: flex; gap: 10px; justify-content: flex-end;">
-        <button class="btn btn-primary" style="width: 100%;" onclick="confirmStudentIdentity()">手動確認並開始</button>
       </div>
     </div>
   </div>
